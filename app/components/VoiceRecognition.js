@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 
-const voiceRecognition = () => {
+const VoiceRecognition = () => {
     const [isListening, setIsListening] = useState(false);
     const [transcription, setTranscription] = useState('');
     const [lastPoint, setLastPoint] = useState('');
@@ -87,4 +87,4 @@ const voiceRecognition = () => {
 </div>);
 }
 
-export default voiceRecognition;
+export default VoiceRecognition;
