@@ -6,9 +6,6 @@ const VoiceRecognition = () => {
     const [lastWord, setLastWord] = useState('');
     const micRef = useRef(null);
     const streamRef = useRef(null);
-    const audioContextRef = useRef(null);
-    const analyserRef = useRef(null);
-    const isRecognizingRef = useRef(false);
 
     useEffect(() => {
         if (!("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
@@ -19,7 +16,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = false; // Se activa manualmente cuando detectamos sonido
+        micRef.current.continuous = true;  // 🔹 Siempre escuchando
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -31,65 +28,27 @@ const VoiceRecognition = () => {
             if (word === 'derecho' || word === 'revés') {
                 setLastWord(word);
             }
-
-            isRecognizingRef.current = false; // Permitir que se reactive con sonido
         };
 
         micRef.current.onend = () => {
-            isRecognizingRef.current = false; // Permitir nueva detección por sonido
+            if (isListening) micRef.current.start(); // 🔹 Reiniciar escucha automáticamente
         };
 
         return () => micRef.current.abort();
     }, []);
 
-    const startAudioProcessing = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            streamRef.current = stream;
-
-            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            analyserRef.current = audioContextRef.current.createAnalyser();
-
-            const source = audioContextRef.current.createMediaStreamSource(stream);
-            source.connect(analyserRef.current);
-
-            const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-
-            const detectSound = () => {
-                if (!isListening) return;
-
-                analyserRef.current.getByteFrequencyData(dataArray);
-                const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-
-                if (volume >= 1 && !isRecognizingRef.current) { // 🔹 Sensibilidad ajustable
-                    isRecognizingRef.current = true;
-                    micRef.current.start();
-                }
-
-                requestAnimationFrame(detectSound);
-            };
-
-            detectSound();
-        } catch (error) {
-            console.error("Error accediendo al micrófono:", error);
-        }
-    };
-
-    const stopAudioProcessing = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-        }
-    };
-
-    const toggleListening = () => {
+    const toggleListening = async () => {
         setIsListening((prev) => {
             if (!prev) {
-                startAudioProcessing();
+                micRef.current.start();
+                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+                    streamRef.current = stream;
+                }).catch((err) => console.error("Error accediendo al micrófono:", err));
             } else {
-                stopAudioProcessing();
+                micRef.current.stop();
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                }
             }
             return !prev;
         });
