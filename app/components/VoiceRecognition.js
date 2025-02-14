@@ -11,6 +11,7 @@ const VoiceRecognition = () => {
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const streamRef = useRef(null);
+    const silenceTimeoutRef = useRef(null);
 
     useEffect(() => {
         if (!("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
@@ -67,15 +68,26 @@ const VoiceRecognition = () => {
                 const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
                 const detectSound = () => {
-                    if (!isListening) return; // Si se detiene, salir
+                    if (!isListening) return;
 
                     analyserRef.current.getByteFrequencyData(dataArray);
                     const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-                    if (volume > 20 && !isRecognizingRef.current) { 
+                    if (volume > 5 && !isRecognizingRef.current) {  // 🔹 Ajustado para mayor sensibilidad
                         isRecognizingRef.current = true;
                         micRef.current.start();
                     }
+
+                    // Si hay silencio prolongado, genera el siguiente punto
+                    clearTimeout(silenceTimeoutRef.current);
+                    silenceTimeoutRef.current = setTimeout(() => {
+                        if (!isRecognizingRef.current && points.length > 0) {
+                            const nextPoint = lastPoint === 'derecho' ? 'revés' : 'derecho';
+                            const utterance = new SpeechSynthesisUtterance(`El siguiente punto es: ${nextPoint}`);
+                            utterance.lang = 'es-ES';
+                            window.speechSynthesis.speak(utterance);
+                        }
+                    }, 2500); // 🔹 Espera 2.5s de silencio antes de generar un punto
 
                     requestAnimationFrame(detectSound);
                 };
@@ -89,6 +101,7 @@ const VoiceRecognition = () => {
         startAudioProcessing();
 
         return () => {
+            clearTimeout(silenceTimeoutRef.current);
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
             }
