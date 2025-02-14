@@ -15,7 +15,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = true; // Sigue escuchando
+        micRef.current.continuous = true; // Mantiene la escucha activa
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -31,18 +31,18 @@ const VoiceRecognition = () => {
 
         micRef.current.onend = () => {
             if (isListening) {
-                micRef.current.start(); // 🔄 Reinicia la escucha automáticamente
+                micRef.current.start(); // 🔄 Reactiva la escucha automáticamente
             }
         };
 
-        return () => micRef.current.stop();
+        return () => micRef.current.abort(); // Detener al desmontar el componente
     }, []);
 
     useEffect(() => {
         if (isListening) {
             micRef.current.start();
         } else {
-            micRef.current.stop();
+            micRef.current.abort(); // Detiene completamente la sesión
         }
     }, [isListening]);
 
