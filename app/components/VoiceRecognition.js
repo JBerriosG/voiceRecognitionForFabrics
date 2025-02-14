@@ -5,7 +5,6 @@ const VoiceRecognition = () => {
     const [isListening, setIsListening] = useState(false);
     const [lastWord, setLastWord] = useState('');
     const micRef = useRef(null);
-    const streamRef = useRef(null);
 
     useEffect(() => {
         if (!("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
@@ -31,24 +30,19 @@ const VoiceRecognition = () => {
         };
 
         micRef.current.onend = () => {
-            if (isListening) micRef.current.start(); // 🔹 Reiniciar escucha automáticamente
+            if (isListening) {
+                micRef.current.start(); // 🔹 Reiniciar escucha automáticamente
+            }
         };
 
-        return () => micRef.current.abort();
-    }, []);
+    }, [isListening]);
 
-    const toggleListening = async () => {
+    const toggleListening = () => {
         setIsListening((prev) => {
             if (!prev) {
                 micRef.current.start();
-                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                    streamRef.current = stream;
-                }).catch((err) => console.error("Error accediendo al micrófono:", err));
             } else {
                 micRef.current.stop();
-                if (streamRef.current) {
-                    streamRef.current.getTracks().forEach(track => track.stop());
-                }
             }
             return !prev;
         });
