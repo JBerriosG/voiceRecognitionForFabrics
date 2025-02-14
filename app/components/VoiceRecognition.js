@@ -1,13 +1,15 @@
-'use client'
+'use client';
 import { useState, useEffect, useRef } from 'react';
 
 const VoiceRecognition = () => {
-    const [isListening, setIsListening] = useState(false);
     const [transcription, setTranscription] = useState('');
     const [lastPoint, setLastPoint] = useState('');
     const [points, setPoints] = useState([]);
-    const [hasTranscribed, setHasTranscribed] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
     const micRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const analyserRef = useRef(null);
+    const streamRef = useRef(null);
 
     useEffect(() => {
         if (!("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
@@ -18,7 +20,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = true;
+        micRef.current.continuous = false; // Para evitar que se quede activo todo el tiempo
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -29,7 +31,6 @@ const VoiceRecognition = () => {
 
             if (point.includes('derecho') || point.includes('revés')) {
                 setTranscription(point);
-                setHasTranscribed(true);
                 setPoints((prevPoints) => {
                     const updatedPoints = [...prevPoints, point];
                     setLastPoint(updatedPoints[updatedPoints.length - 1]);
@@ -39,56 +40,69 @@ const VoiceRecognition = () => {
         };
 
         micRef.current.onend = () => {
-            if (isListening) {
-                setTimeout(() => micRef.current.start(), 500); // Espera medio segundo antes de reiniciar
-            }
+            if (isSpeaking) micRef.current.start();
         };
 
         return () => {
             micRef.current.stop();
         };
+    }, [isSpeaking]);
+
+    useEffect(() => {
+        const startAudioProcessing = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                streamRef.current = stream;
+
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                analyserRef.current = audioContextRef.current.createAnalyser();
+                const source = audioContextRef.current.createMediaStreamSource(stream);
+                source.connect(analyserRef.current);
+
+                const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+
+                const detectSound = () => {
+                    analyserRef.current.getByteFrequencyData(dataArray);
+                    const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+                    if (volume > 10 && !isSpeaking) {
+                        setIsSpeaking(true);
+                        micRef.current.start();
+                    } else if (volume <= 10 && isSpeaking) {
+                        setIsSpeaking(false);
+                        micRef.current.stop();
+                    }
+
+                    requestAnimationFrame(detectSound);
+                };
+
+                detectSound();
+            } catch (error) {
+                console.error("Error accediendo al micrófono:", error);
+            }
+        };
+
+        startAudioProcessing();
+
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+            }
+            if (audioContextRef.current) {
+                audioContextRef.current.close();
+            }
+        };
     }, []);
-
-    useEffect(() => {
-        if (isListening) {
-            setHasTranscribed(false);
-            micRef.current.start();
-        } else {
-            micRef.current.stop();
-        }
-    }, [isListening]);
-
-    useEffect(() => {
-        if (!isListening && points.length > 0) {
-            const timer = setTimeout(() => {
-                if (!hasTranscribed) {
-                    const nextPoint = lastPoint === 'derecho' ? 'revés' : 'derecho';
-                    const utterance = new SpeechSynthesisUtterance(`El siguiente punto es: ${nextPoint}`);
-                    utterance.lang = 'es-ES';
-                    window.speechSynthesis.speak(utterance);
-                }
-            }, 2000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [hasTranscribed, isListening, lastPoint, points]);
-
-    const toggleListening = () => {
-        setIsListening((prev) => !prev);
-    };
 
     return (
         <div className="max-w-lg mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-4 text-center">
-            <h2 className="text-xl font-bold text-gray-800">Reconocimiento de voz para tejido</h2>
-            <button 
-                onClick={toggleListening} 
-                className={`px-4 py-2 w-full font-semibold rounded-lg shadow-md transition ${
-                    isListening ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
-                } text-white`}
-            >
-                {isListening ? 'Detener escucha' : 'Comenzar a escuchar'}
-            </button>
+            <h2 className="text-xl font-bold text-gray-800">Reconocimiento de voz automático</h2>
             <div className="bg-gray-100 p-4 rounded-lg shadow-inner space-y-2">
+                <p className="text-gray-700 font-medium">
+                    Estado del micrófono: <span className={`font-bold ${isSpeaking ? 'text-green-600' : 'text-red-600'}`}>
+                        {isSpeaking ? 'Escuchando...' : 'Silencioso'}
+                    </span>
+                </p>
                 <p className="text-gray-700 font-medium">Último punto registrado: <span className="font-bold">{lastPoint}</span></p>
                 <p className="text-gray-700 font-medium">Lo que dijiste: <span className="italic">{transcription}</span></p>
                 <p className="text-gray-700 font-medium">Secuencia de puntos: <span className="font-mono">{points.join(', ')}</span></p>
