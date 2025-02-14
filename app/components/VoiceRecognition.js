@@ -6,6 +6,7 @@ const VoiceRecognition = () => {
     const [transcription, setTranscription] = useState('');
     const [lastPoint, setLastPoint] = useState('');
     const [points, setPoints] = useState([]);
+    const [hasTranscribed, setHasTranscribed] = useState(false);
     const micRef = useRef(null);
 
     useEffect(() => {
@@ -28,6 +29,7 @@ const VoiceRecognition = () => {
 
             if (point.includes('derecho') || point.includes('revés')) {
                 setTranscription(point);
+                setHasTranscribed(true);
                 setPoints((prevPoints) => {
                     const updatedPoints = [...prevPoints, point];
                     setLastPoint(updatedPoints[updatedPoints.length - 1]);
@@ -37,7 +39,9 @@ const VoiceRecognition = () => {
         };
 
         micRef.current.onend = () => {
-            if (isListening) micRef.current.start();
+            if (isListening) {
+                setTimeout(() => micRef.current.start(), 500); // Espera medio segundo antes de reiniciar
+            }
         };
 
         return () => {
@@ -47,6 +51,7 @@ const VoiceRecognition = () => {
 
     useEffect(() => {
         if (isListening) {
+            setHasTranscribed(false);
             micRef.current.start();
         } else {
             micRef.current.stop();
@@ -56,7 +61,7 @@ const VoiceRecognition = () => {
     useEffect(() => {
         if (!isListening && points.length > 0) {
             const timer = setTimeout(() => {
-                if (!transcription) {
+                if (!hasTranscribed) {
                     const nextPoint = lastPoint === 'derecho' ? 'revés' : 'derecho';
                     const utterance = new SpeechSynthesisUtterance(`El siguiente punto es: ${nextPoint}`);
                     utterance.lang = 'es-ES';
@@ -66,7 +71,7 @@ const VoiceRecognition = () => {
 
             return () => clearTimeout(timer);
         }
-    }, [transcription, isListening, lastPoint, points]);
+    }, [hasTranscribed, isListening, lastPoint, points]);
 
     const toggleListening = () => {
         setIsListening((prev) => !prev);
