@@ -15,7 +15,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = true;
+        micRef.current.continuous = true; // Sigue escuchando
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -30,7 +30,9 @@ const VoiceRecognition = () => {
         };
 
         micRef.current.onend = () => {
-            if (isListening) micRef.current.start();
+            if (isListening) {
+                micRef.current.start(); // 🔄 Reinicia la escucha automáticamente
+            }
         };
 
         return () => micRef.current.stop();
