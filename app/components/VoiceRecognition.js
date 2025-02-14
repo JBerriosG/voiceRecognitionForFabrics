@@ -6,6 +6,7 @@ const VoiceRecognition = () => {
     const [lastPoint, setLastPoint] = useState('');
     const [points, setPoints] = useState([]);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const isRecognizingRef = useRef(false);
     const micRef = useRef(null);
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
@@ -20,7 +21,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = false; // Para evitar que se quede activo todo el tiempo
+        micRef.current.continuous = false; // Se activa solo cuando detecta voz
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -37,16 +38,18 @@ const VoiceRecognition = () => {
                     return updatedPoints;
                 });
             }
+
+            isRecognizingRef.current = false; // Permite volver a iniciar la escucha
         };
 
         micRef.current.onend = () => {
-            if (isSpeaking) micRef.current.start();
+            isRecognizingRef.current = false; // Resetea el flag
         };
 
         return () => {
-            micRef.current.stop();
+            micRef.current.abort();
         };
-    }, [isSpeaking]);
+    }, []);
 
     useEffect(() => {
         const startAudioProcessing = async () => {
@@ -65,12 +68,11 @@ const VoiceRecognition = () => {
                     analyserRef.current.getByteFrequencyData(dataArray);
                     const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-                    if (volume > 10 && !isSpeaking) {
+                    if (volume > 20 && !isRecognizingRef.current) { 
+                        // Ajuste de sensibilidad
+                        isRecognizingRef.current = true;
                         setIsSpeaking(true);
                         micRef.current.start();
-                    } else if (volume <= 10 && isSpeaking) {
-                        setIsSpeaking(false);
-                        micRef.current.stop();
                     }
 
                     requestAnimationFrame(detectSound);
