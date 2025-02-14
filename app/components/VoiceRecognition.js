@@ -61,7 +61,7 @@ const VoiceRecognition = () => {
                 analyserRef.current.getByteFrequencyData(dataArray);
                 const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-                if (volume > 5 && !isRecognizingRef.current) { // 🔹 Sensibilidad ajustable
+                if (volume >= 1 && !isRecognizingRef.current) { // 🔹 Sensibilidad ajustable
                     isRecognizingRef.current = true;
                     micRef.current.start();
                 }
