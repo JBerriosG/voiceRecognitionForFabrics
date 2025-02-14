@@ -2,10 +2,10 @@
 import { useState, useEffect, useRef } from 'react';
 
 const VoiceRecognition = () => {
+    const [isListening, setIsListening] = useState(false);
     const [transcription, setTranscription] = useState('');
     const [lastPoint, setLastPoint] = useState('');
     const [points, setPoints] = useState([]);
-    const [isSpeaking, setIsSpeaking] = useState(false);
     const isRecognizingRef = useRef(false);
     const micRef = useRef(null);
     const audioContextRef = useRef(null);
@@ -21,7 +21,7 @@ const VoiceRecognition = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         micRef.current = new SpeechRecognition();
 
-        micRef.current.continuous = false; // Se activa solo cuando detecta voz
+        micRef.current.continuous = false;
         micRef.current.lang = 'es-ES';
         micRef.current.interimResults = false;
         micRef.current.maxAlternatives = 1;
@@ -39,11 +39,11 @@ const VoiceRecognition = () => {
                 });
             }
 
-            isRecognizingRef.current = false; // Permite volver a iniciar la escucha
+            isRecognizingRef.current = false;
         };
 
         micRef.current.onend = () => {
-            isRecognizingRef.current = false; // Resetea el flag
+            isRecognizingRef.current = false;
         };
 
         return () => {
@@ -52,6 +52,8 @@ const VoiceRecognition = () => {
     }, []);
 
     useEffect(() => {
+        if (!isListening) return;
+
         const startAudioProcessing = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -65,13 +67,13 @@ const VoiceRecognition = () => {
                 const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
                 const detectSound = () => {
+                    if (!isListening) return; // Si se detiene, salir
+
                     analyserRef.current.getByteFrequencyData(dataArray);
                     const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
                     if (volume > 20 && !isRecognizingRef.current) { 
-                        // Ajuste de sensibilidad
                         isRecognizingRef.current = true;
-                        setIsSpeaking(true);
                         micRef.current.start();
                     }
 
@@ -94,15 +96,27 @@ const VoiceRecognition = () => {
                 audioContextRef.current.close();
             }
         };
-    }, []);
+    }, [isListening]);
+
+    const toggleListening = () => {
+        setIsListening((prev) => !prev);
+    };
 
     return (
         <div className="max-w-lg mx-auto bg-white shadow-lg rounded-2xl p-6 space-y-4 text-center">
             <h2 className="text-xl font-bold text-gray-800">Reconocimiento de voz automático</h2>
+            <button 
+                onClick={toggleListening} 
+                className={`px-4 py-2 w-full font-semibold rounded-lg shadow-md transition ${
+                    isListening ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+                } text-white`}
+            >
+                {isListening ? 'Detener escucha' : 'Comenzar a escuchar'}
+            </button>
             <div className="bg-gray-100 p-4 rounded-lg shadow-inner space-y-2">
                 <p className="text-gray-700 font-medium">
-                    Estado del micrófono: <span className={`font-bold ${isSpeaking ? 'text-green-600' : 'text-red-600'}`}>
-                        {isSpeaking ? 'Escuchando...' : 'Silencioso'}
+                    Estado del micrófono: <span className={`font-bold ${isListening ? 'text-green-600' : 'text-red-600'}`}>
+                        {isListening ? 'Activo' : 'Desactivado'}
                     </span>
                 </p>
                 <p className="text-gray-700 font-medium">Último punto registrado: <span className="font-bold">{lastPoint}</span></p>
